@@ -34,7 +34,7 @@
 ### 2.1. Пример резервирования и восстановления через `pg_dump`/`pg_restore`
 
 **Резервирование (дамп) с помощью `pg_dump`:**
-```bash
+\`\`\`bash
 # Дамп в формате кастомном (подходит для pg_restore)
 pg_dump -U username -d database_name -F c -f /backup/backup.dump
 
@@ -43,9 +43,10 @@ pg_dump -U username -d database_name -F c -f /backup/backup.dump
 # -d — база данных
 # -F c — формат custom (сжатый, поддерживает выбор объектов при восстановлении)
 # -f — файл для вывода
-Восстановление с помощью pg_restore:
+\`\`\`
 
-bash
+**Восстановление с помощью `pg_restore`:**
+\`\`\`bash
 # Восстановить всю БД
 pg_restore -U username -d new_database_name /backup/backup.dump
 
@@ -54,39 +55,45 @@ pg_restore -U username -d new_database_name --schema-only /backup/backup.dump
 
 # Восстановить только данные
 pg_restore -U username -d new_database_name --data-only /backup/backup.dump
-Для Point-in-Time Recovery используется непрерывная архивация WAL-файлов и восстановление до метки времени (с помощью pg_basebackup и recovery.conf/postgresql.conf).
+\`\`\`
 
-Задание 3. MySQL
-3.1. Пример инкрементного резервного копирования
-Инкрементное копирование в MySQL обычно основывается на binlog.
+**Для Point-in-Time Recovery** используется непрерывная архивация WAL-файлов и восстановление до метки времени (с помощью `pg_basebackup` и `recovery.conf`/`postgresql.conf`).
 
-Полный бэкап (раз в сутки) через mysqldump или mysqlbackup (для InnoDB):
+---
 
-bash
+## **Задание 3. MySQL**
+
+### 3.1. Пример инкрементного резервного копирования
+
+**Инкрементное копирование в MySQL обычно основывается на binlog.**
+
+1. **Полный бэкап (раз в сутки) через `mysqldump` или `mysqlbackup` (для InnoDB):**
+\`\`\`bash
 mysqldump -u root -p --single-transaction --flush-logs --master-data=2 --all-databases > full_backup.sql
---flush-logs — закрывает текущий binlog и начинает новый (важно для инкрементных бэкапов).
+\`\`\`
+   - `--flush-logs` — закрывает текущий binlog и начинает новый (важно для инкрементных бэкапов).
+   - `--master-data=2` — записывает позицию binlog в дамп.
 
---master-data=2 — записывает позицию binlog в дамп.
-
-Инкрементный бэкап — копирование binlog-файлов, созданных после полного бэкапа:
-
-bash
+2. **Инкрементный бэкап — копирование binlog-файлов, созданных после полного бэкапа:**
+\`\`\`bash
 # После полного бэкапа копируем новые binlog-файлы
 cp /var/lib/mysql/mysql-bin.0000* /backup/incremental/
-Восстановление:
+\`\`\`
 
-Восстановить полный бэкап.
-
-Применить инкрементные binlog-файлы с помощью mysqlbinlog:
-
-bash
+3. **Восстановление:**
+   - Восстановить полный бэкап.
+   - Применить инкрементные binlog-файлы с помощью `mysqlbinlog`:
+\`\`\`bash
 mysqlbinlog /backup/incremental/mysql-bin.00000X | mysql -u root -p
-Использование утилиты mariabackup/xtrabackup (поддерживает инкрементные бэкапы на уровне файлов):
+\`\`\`
 
-bash
+**Использование утилиты `mariabackup`/`xtrabackup` (поддерживает инкрементные бэкапы на уровне файлов):**
+\`\`\`bash
 # Полный бэкап
 mariabackup --backup --target-dir=/backup/full --user=root --password=123
 
 # Инкрементный бэкап (относительно полного)
 mariabackup --backup --target-dir=/backup/inc1 --incremental-basedir=/backup/full --user=root --password=123
-Для MySQL Enterprise Edition доступен mysqlbackup с встроенной поддержкой инкрементных бэкапов.
+\`\`\`
+
+Для MySQL Enterprise Edition доступен `mysqlbackup` с встроенной поддержкой инкрементных бэкапов.
