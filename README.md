@@ -1,113 +1,112 @@
-Задание 1. Резервное копирование
-Кейс
-Финансовая компания решила увеличить надёжность работы баз данных и их резервного копирования.
-
-Необходимо описать в свободной форме, какие варианты резервного копирования подходят в случаях:
-
-1.1. Необходимо восстанавливать данные в полном объёме за предыдущий день.
-
-1.2. Необходимо восстанавливать данные за час до предполагаемой поломки.
-
-Приведите ответ в свободной форме.
-
-Задание 2. PostgreSQL
-2.1. С помощью официальной документации приведите пример команды резервирования данных и восстановления БД (pgdump/pgrestore).
-
-Приведите ответ в свободной форме.
-
-Задание 3. MySQL
-3.1. С помощью официальной документации приведите пример команды инкрементного резервного копирования базы данных MySQL.
-
-Приведите ответ в свободной форме.
+# Резервное копирование баз данных
+## Косарев Д.О.
 
 ---
 
-## Ответы на задания
+### Ответ на задание 1.1:
+**Для восстановления данных в полном объёме за предыдущий день** подходит **ежедневное полное резервное копирование (Full Backup)**.
 
-### Задание 1. Резервное копирование
+**Причины:**
+1. Резервная копия содержит полный снимок всех данных на конец предыдущего дня
+2. Восстановление выполняется быстро из одного файла без необходимости сборки из нескольких источников
+3. Простота администрирования и контроля
 
-#### 1.1. Необходимо восстанавливать данные в полном объёме за предыдущий день.
-Для этого подходит **ежедневное полное резервное копирование (Full Backup)**, выполняемое один раз в сутки (например, ночью, когда нагрузка минимальна).
-
-**Почему это подходит:**
-- Резервная копия содержит все данные на момент окончания предыдущего дня.
-- Восстановление происходит быстро из одного архива.
-- Минус: большой объём хранимых данных и высокая нагрузка на систему во время создания бэкапа.
-
-**Альтернатива:** Еженедельное полное копирование + ежедневные инкрементные/дифференциальные бэкапы, но восстановление за предыдущий день потребует применения цепочки бэкапов.
-
-#### 1.2. Необходимо восстанавливать данные за час до предполагаемой поломки.
-Здесь нужен **комбинированный подход**:
-1. **Полное резервное копирование** (раз в сутки или реже).
-2. **Инкрементное или дифференциальное копирование** каждые несколько часов.
-3. **Резервирование журналов транзакций (WAL в PostgreSQL, binlog в MySQL)** для восстановления на момент времени (Point-in-Time Recovery, PITR).
-
-**Почему это подходит:**
-- Инкрементные/дифференциальные бэкапы уменьшают нагрузку и место на диске.
-- Журналы транзакций позволяют восстановить данные на точный момент (до часа до сбоя).
-- Пример: полный бэкап в 00:00 + инкрементные каждые 4 часа + непрерывная архивация WAL/binlog.
+**Рекомендуемая схема:**
+- Выполнение полного бэкапа каждую ночь в 00:00-03:00 (период минимальной нагрузки)
+- Хранение на отдельном сервере или облачном хранилище
+- Регулярное тестирование восстановления
 
 ---
 
-### Задание 2. PostgreSQL
+### Ответ на задание 1.2:
+**Для восстановления данных за час до поломки** требуется **комбинированная стратегия с использованием Point-in-Time Recovery (PITR)**.
 
-#### 2.1. С помощью официальной документации приведите пример команды резервирования данных и восстановления БД (pgdump/pgrestore).
+**Многоуровневая схема:**
+1. **Полное резервное копирование** - выполняется 1 раз в сутки
+2. **Инкрементное копирование** - выполняется каждые 2-4 часа
+3. **Непрерывная архивация журналов транзакций** - WAL для PostgreSQL или binlog для MySQL
 
-**Пример резервирования данных с помощью `pg_dump`:**
+**Техническая реализация:**
+График резервного копирования:
+00:00 - Полный бэкап
+04:00 - Инкрементный бэкап
+08:00 - Инкрементный бэкап
+12:00 - Инкрементный бэкап
+16:00 - Инкрементный бэкап
+20:00 - Инкрементный бэкап
+
+Непрерывная архивация журналов (каждые 5-10 минут)
+
+text
+
+**Восстановление:**
+1. Восстанавливается последний полный бэкап
+2. Применяются все инкрементные бэкапы после него
+3. Восстанавливаются журналы транзакций до нужного момента времени
+
+---
+
+### Ответ на задание 2.1:
+**Примеры команд PostgreSQL для резервирования и восстановления:**
+
+**Создание резервной копии:**
 \`\`\`bash
-# Создание полного бэкапа базы данных в кастомном формате
-pg_dump -U postgres -d my_database -F c -f /backup/my_database_backup.dump
+# Создание полного дампа базы данных
+pg_dump -U postgres -d company_finance -F c -v -Z 9 -f /backup/finance_$(date +%Y%m%d).dump
 
 # Опции:
-# -U postgres      — пользователь PostgreSQL
-# -d my_database   — имя базы данных для резервного копирования
-# -F c             — формат custom (сжатый, позволяет выборочное восстановление)
-# -f               — указание файла для сохранения бэкапа
-# -v               — подробный режим (опционально)
-# --clean          — добавить команды для очистки объектов БД перед восстановлением (опционально)
+# -U postgres           - пользователь PostgreSQL
+# -d company_finance    - база данных для резервирования
+# -F c                  - формат custom (поддерживает сжатие)
+# -v                    - подробный вывод
+# -Z 9                  - максимальное сжатие
+# -f                    - файл для сохранения
 \`\`\`
 
-**Пример восстановления БД с помощью `pg_restore`:**
+**Восстановление базы данных:**
 \`\`\`bash
-# Восстановление всей базы данных из бэкапа
-pg_restore -U postgres -d my_database_restored /backup/my_database_backup.dump
+# Полное восстановление базы
+pg_restore -U postgres -d finance_restored /backup/finance_20240115.dump
 
-# Восстановление только структуры базы данных (без данных)
-pg_restore -U postgres -d my_database_restored --schema-only /backup/my_database_backup.dump
+# Восстановление только структуры (без данных)
+pg_restore -U postgres -d new_database --schema-only /backup/finance_20240115.dump
 
-# Восстановление только данных (в существующую структуру)
-pg_restore -U postgres -d my_database_restored --data-only /backup/my_database_backup.dump
+# Восстановление только данных
+pg_restore -U postgres -d existing_db --data-only /backup/finance_20240115.dump
 
-# Восстановление с созданием новой базы данных
-createdb -U postgres my_new_database
-pg_restore -U postgres -d my_new_database /backup/my_database_backup.dump
+# Восстановление конкретных таблиц
+pg_restore -U postgres -d database --table=customers --table=transactions /backup/finance_20240115.dump
+\`\`\`
 
-# Просмотр содержимого файла бэкапа
-pg_restore -l /backup/my_database_backup.dump
+**Настройка WAL архивации для PITR:**
+\`\`\`bash
+# В postgresql.conf:
+wal_level = replica
+archive_mode = on
+archive_command = 'test ! -f /backup/wal/%f && cp %p /backup/wal/%f'
 \`\`\`
 
 ---
 
-### Задание 3. MySQL
+### Ответ на задание 3.1:
+**Пример инкрементного резервного копирования MySQL:**
 
-#### 3.1. С помощью официальной документации приведите пример команды инкрементного резервного копирования базы данных MySQL.
-
-**Пример инкрементного резервного копирования MySQL на основе binlog:**
-
-**1. Настройка MySQL для ведения бинарных логов (в файле my.cnf):**
+**1. Настройка MySQL для binlog:**
 \`\`\`ini
+# В файле /etc/mysql/my.cnf
 [mysqld]
 server-id = 1
 log-bin = /var/log/mysql/mysql-bin.log
 binlog-format = ROW
-expire-logs-days = 7
+expire-logs-days = 14
 max_binlog_size = 100M
+sync_binlog = 1
 \`\`\`
 
-**2. Создание полного бэкапа с фиксацией позиции binlog:**
+**2. Полное резервное копирование:**
 \`\`\`bash
-# Создание полного резервного копирования всех баз данных
-mysqldump -u root -p \
+# Создание полного бэкапа с фиксацией позиции binlog
+mysqldump -u backup_user -p'secure_password' \
   --single-transaction \
   --flush-logs \
   --master-data=2 \
@@ -115,111 +114,78 @@ mysqldump -u root -p \
   --routines \
   --events \
   --triggers \
+  --hex-blob \
   > /backup/full_backup_$(date +%Y%m%d_%H%M%S).sql
 
-# Опции команды:
-# --single-transaction — создает согласованный снимок данных для InnoDB таблиц
-# --flush-logs        — закрывает текущий бинарный лог и начинает новый
-# --master-data=2     — записывает позицию бинарного лога в виде комментария
-# --all-databases     — включает все базы данных в дамп
-# --routines          — включает хранимые процедуры и функции
-# --events            — включает события
-# --triggers          — включает триггеры
+# Проверка позиции binlog в дампе
+grep "CHANGE MASTER" /backup/full_backup_20240115_000000.sql
 \`\`\`
 
-**3. Инкрементное копирование бинарных логов:**
+**3. Инкрементное копирование (автоматизация через скрипт):**
 \`\`\`bash
-# Копирование бинарных логов, созданных после полного бэкапа
-cp /var/log/mysql/mysql-bin.0* /backup/incremental/
+#!/bin/bash
+# Скрипт incremental_backup.sh
+BACKUP_DIR="/backup/incremental"
+LOG_FILE="/var/log/mysql_backup.log"
 
-# Или использование mysqlbinlog для извлечения изменений
-mysqlbinlog \
-  --read-from-remote-server \
-  --host=localhost \
-  --user=root \
-  --password \
-  --raw \
-  --result-file=/backup/incremental/ \
-  mysql-bin.00000*
+# Определяем последний скопированный binlog
+LAST_BACKUP=$(ls -t $BACKUP_DIR/mysql-bin.* 2>/dev/null | head -1)
 
-# Ротация и архивация бинарных логов по расписанию (пример cron)
-# 0 */4 * * * cp /var/log/mysql/mysql-bin.0* /backup/incremental/ && mysql -e "PURGE BINARY LOGS BEFORE NOW() - INTERVAL 1 DAY"
+if [ -z "$LAST_BACKUP" ]; then
+    # Первый инкрементный бэкап - копируем все binlog-файлы
+    cp /var/log/mysql/mysql-bin.* $BACKUP_DIR/
+else
+    # Копируем только новые файлы
+    LAST_FILE=$(basename $LAST_BACKUP)
+    CURRENT_NUM=$(echo $LAST_FILE | grep -o '[0-9]*' | tail -1)
+    
+    for file in /var/log/mysql/mysql-bin.*; do
+        FILE_NUM=$(echo $file | grep -o '[0-9]*' | tail -1)
+        if [ "$FILE_NUM" -gt "$CURRENT_NUM" ]; then
+            cp "$file" "$BACKUP_DIR/"
+        fi
+    done
+fi
+
+# Очистка старых binlog-файлов на сервере
+mysql -u root -p'password' -e "PURGE BINARY LOGS BEFORE NOW() - INTERVAL 7 DAY"
 \`\`\`
 
 **4. Восстановление из инкрементного бэкапа:**
 \`\`\`bash
-# Восстановление полного бэкапа
-mysql -u root -p < /backup/full_backup_20240101.sql
+# Шаг 1: Восстановление полного бэкапа
+mysql -u root -p < /backup/full_backup_20240115.sql
 
-# Применение инкрементных изменений из бинарных логов
-mysqlbinlog /backup/incremental/mysql-bin.000002 \
-  /backup/incremental/mysql-bin.000003 \
-  /backup/incremental/mysql-bin.000004 \
-  | mysql -u root -p
-
-# Восстановление до определённого момента времени
+# Шаг 2: Применение инкрементных изменений
 mysqlbinlog \
-  --stop-datetime="2024-01-01 23:59:59" \
+  --start-datetime="2024-01-15 00:00:00" \
+  --stop-datetime="2024-01-15 23:00:00" \
   /backup/incremental/mysql-bin.[0-9]* \
   | mysql -u root -p
 
-# Восстановление до определённой позиции в binlog
+# Или восстановление до конкретной позиции
 mysqlbinlog \
-  --stop-position=123456 \
+  --start-position=107 \
+  --stop-position=4500 \
   /backup/incremental/mysql-bin.000002 \
   | mysql -u root -p
 \`\`\`
 
-**5. Использование Percona XtraBackup для физического инкрементного копирования:**
-\`\`\`bash
-# Полный бэкап (базовый уровень)
-xtrabackup \
-  --backup \
-  --target-dir=/backup/full \
-  --user=root \
-  --password=your_password
-
-# Подготовка полного бэкапа для восстановления
-xtrabackup --prepare --target-dir=/backup/full
-
-# Первый инкрементный бэкап (относительно полного)
-xtrabackup \
-  --backup \
-  --target-dir=/backup/inc1 \
-  --incremental-basedir=/backup/full \
-  --user=root \
-  --password=your_password
-
-# Второй инкрементный бэкап (относительно предыдущего инкрементного)
-xtrabackup \
-  --backup \
-  --target-dir=/backup/inc2 \
-  --incremental-basedir=/backup/inc1 \
-  --user=root \
-  --password=your_password
-
-# Подготовка инкрементных бэкапов для восстановления
-xtrabackup --prepare --apply-log-only --target-dir=/backup/full
-xtrabackup --prepare --apply-log-only --target-dir=/backup/full --incremental-dir=/backup/inc1
-xtrabackup --prepare --target-dir=/backup/full --incremental-dir=/backup/inc2
-
-# Восстановление из подготовленного бэкапа
-systemctl stop mysql
-rm -rf /var/lib/mysql/*
-xtrabackup --copy-back --target-dir=/backup/full
-chown -R mysql:mysql /var/lib/mysql
-systemctl start mysql
-\`\`\`
-
-**6. Использование MySQL Enterprise Backup для инкрементных бэкапов:**
+**5. Использование XtraBackup для физических инкрементных бэкапов:**
 \`\`\`bash
 # Полный бэкап
-mysqlbackup --backup-dir=/backup/full --backup-image=/backup/full.mbi backup-to-image
+xtrabackup --backup --target-dir=/backup/full --user=root --password
 
-# Инкрементный бэкап
-mysqlbackup --backup-dir=/backup/inc1 --incremental --incremental-base=history:last_full_backup backup-to-image
+# Инкрементный бэкап (раз в 4 часа)
+xtrabackup --backup \
+  --target-dir=/backup/inc_$(date +%H) \
+  --incremental-basedir=/backup/full \
+  --user=root \
+  --password
 
-# Восстановление
-mysqlbackup --backup-dir=/backup/full --backup-image=/backup/full.mbi copy-back-and-apply-log
-mysqlbackup --backup-dir=/backup/inc1 --backup-image=/backup/inc1.mbi --incremental copy-back-and-apply-log
+# Подготовка к восстановлению
+xtrabackup --prepare --apply-log-only --target-dir=/backup/full
+xtrabackup --prepare --target-dir=/backup/full --incremental-dir=/backup/inc_04
+xtrabackup --prepare --target-dir=/backup/full --incremental-dir=/backup/inc_08
 \`\`\`
+
